@@ -39,6 +39,7 @@
  * ***** END LICENSE BLOCK *****
  */
 
+#include "amqp.h"
 #include "config.h"
 
 /* Error numbering: Because of differences in error numbering on
@@ -63,9 +64,14 @@
 #define ERROR_BAD_AMQP_URL 8
 #define ERROR_MAX 8
 
+#include "socket.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern char *amqp_os_error_string(int err);
 
-#include "socket.h"
 
 /*
  * Connection states: XXX FIX THIS
@@ -102,14 +108,70 @@ typedef enum amqp_connection_state_enum_ {
 
 #define AMQP_PSEUDOFRAME_PROTOCOL_HEADER 'A'
 
+#define INITIAL_FRAME_POOL_PAGE_SIZE 65536
+#define INITIAL_INBOUND_SOCK_BUFFER_SIZE 131072
+
 typedef struct amqp_link_t_ {
   struct amqp_link_t_ *next;
   void *data;
 } amqp_link_t;
 
+#define AMQP_HASHTABLE_SIZE 256
+
+typedef struct amqp_hashtable_entry_t_ {
+    struct amqp_hashtable_entry_t_ *next;
+    amqp_pool_t data;
+    amqp_channel_t key;
+} amqp_hashtable_entry_t;
+
+typedef struct amqp_hashtable_t_ {
+    amqp_hashtable_entry_t* entries[AMQP_HASHTABLE_SIZE];
+} amqp_hashtable_t;
+
+/**
+  * Memory allocation scheme for amqp_connection_state_t:
+  *
+  * Most memory allocation in the library is done using an amqp_pool_t
+  * Since pools can only be recycled when everything in them is no
+  * longer being used we separate out usage so that it has an affinity
+  * to the channel.
+  *
+  * When receiving data on a socket, the library allocates a buffer
+  * to hold the data. This data comes from a 'frame_pool'. Once a complete
+  * frame is received it is decoded.  If the frame contains a METHOD or
+  * HEADER frame it is decoded, memory is allocated from a 'decoding_pool'.
+  * Since there is little processing done for a BODY frame, its data is NOT
+  * copied to a 'decoding_pool' allocated memory block, instead the frame_pool
+  * that is responsible for the memory allocated to it is associated with a
+  * channel, the pool is returned when the memory for a channel is recycled.
+  *
+  * Relevant amqp_connection_state_t elements:
+  * - pool_cache_pool - this is where frame_pools are allocated from. We assume
+  *                     frame pools will last the lifetime of the connection object
+  * - frame_pool - this points to the 'current' frame_pool. This is NULL if there isn't
+  *                a 'current' frame pool.  To get the current frame pool one
+  *                should use the amqp_get_frame_pool()
+  * - frame_pool_cache - this is a stack of the frame_pools that are not in use.
+  *                      a frame_pool will end up here (in a recycled state) on
+  *                      when a channel's pools are recycled
+  * - decoding_pools - this is a chained hashtable of the decoding_pools. They are
+  *                    created as needed by using the amqp_get_decoding_pool().
+  *                    Each amqp_pool_t also contains a next pointer which frame_pools
+  *                    maybe chained to the decoding pool. The frame_pools are
+  *                    returned to the frame_pool_cache when associated decoding_pool
+  *                    is recycled or destroyed using one of:
+  *                    amqp_recycle_decoding_pool
+  *                    amqp_recycle_all_decoding_pools
+  *                    amqp_destroy_all_decoding_pools
+  */
+
 struct amqp_connection_state_t_ {
-  amqp_pool_t frame_pool;
-  amqp_pool_t decoding_pool;
+  amqp_pool_t pool_cache_pool;
+
+  amqp_pool_t *frame_pool;
+  amqp_pool_t *frame_pool_cache;
+
+  amqp_hashtable_t decoding_pools;
 
   amqp_connection_state_enum state;
 
@@ -261,4 +323,115 @@ static inline int amqp_decode_bytes(amqp_bytes_t encoded, size_t *offset,
 
 extern void amqp_abort(const char *fmt, ...);
 
+/**
+  * Hashing function for the decoding pools table.
+  *
+  * We assume people will use channels in monotoic increasing order
+  * thus just doing key % table size will lead to perfect utilization
+  */
+int amqp_hashtable_channel_hash(amqp_channel_t channel);
+
+/**
+  * Initializes the hashtable
+  *
+  * Just sets everything to zero so we don't deal with junk values
+  */
+void amqp_hashtable_init(amqp_hashtable_t* table);
+
+/**
+  * Adds a pool to the hashtable with the given channel as a key.
+  *
+  * NOTE: this is an internal function, you should probably use amqp_get_decoding_pool instead
+  *
+  * Will return a pointer to the new amqp_pool_t on success.
+  *  Memory is owned by the hashtable and will be freed when amqp_destroy_all_decoding_pools is called
+  * Will return NULL if:
+  *  - the amqp_channel_t already exists in the hashtable
+  *  - memory allocation fails
+  */
+amqp_pool_t* amqp_hashtable_add_pool(amqp_hashtable_t* table, amqp_channel_t channel);
+
+/**
+  * Gets a pool from the hashtable with the given channel as a key
+  *
+  * NOTE: this is an internal function, you should probably use amqp_get_decoding_pool instead
+  *
+  * Will return a pointer to the amqp_pool_t on success.
+  *  Memory is owned by the hashtable and will be freed when amqp_destroy_all_decoding_pools is called
+  * Will return NULL if:
+  *  - the key does not exist in the hash table
+  */
+amqp_pool_t* amqp_hashtable_get_pool(amqp_hashtable_t* table, amqp_channel_t channel);
+
+void amqp_recycle_decoding_pool_inner(amqp_connection_state_t state, amqp_pool_t* decoding_pool);
+
+/**
+  * Gets the decoding pool for a specified channel, allocating if it doesn't exist
+  *
+  * Will return a pointer to the amqp_pool_t associated with the channe on success
+  *  Memory is owned by the state object and will be freed with amqp_destroy_all_decoding_pools is called
+  * The state object owns the decoding pool.
+  * The pool should be recycled using the amqp_recycle_channel_pool or amqp_recycle_all_channel_pools function
+  * All pools associated with the decoding pool structure can be destroyed with amqp_destroy_all_channel_pools
+  */
+amqp_pool_t* amqp_get_decoding_pool(amqp_connection_state_t state, amqp_channel_t channel);
+
+/**
+  * Recycles the decoding amqp_pool_t associated the channel, and recycles and returns any frame pools to the frame_pool_cache
+  *
+  * Recycles the pool by calling recycle_amqp_pool
+  */
+void amqp_recycle_decoding_pool(amqp_connection_state_t state, amqp_channel_t channel);
+
+/**
+  * Recycles all of the decoding amqp_pool_t s, and recycles and returns any frame pools to the frame_pool_cache
+  *
+  * Recycles the pools by calling recycle_amqp_pool
+  */
+void amqp_recycle_all_decoding_pools(amqp_connection_state_t state);
+
+/**
+  * Destroys all of the decoding amqp_pool_t's, and returns any frame pools to the frame_pool_cache WITHOUT destroying them
+  *
+  * Emptys theh pools by calling empty_amqp_pool
+  */
+void amqp_destroy_all_decoding_pools(amqp_connection_state_t state);
+
+/* Gets the current frame pool.
+ *
+ * If there's already a 'current' frame pool it returns that
+ *	If there isn't a current frame pool, it attempts to get one from the cache
+ *  If the cache is empty it creates a new one
+ * Will return NULL on a out of memory condition
+ */
+amqp_pool_t* amqp_get_frame_pool(amqp_connection_state_t state);
+
+/**
+  * Moves gets the current frame_pool and associates it with the decoding pool for the specified channel
+  *
+  * This function creates pools if they do not already exist
+  * Returns 0 on success, non-zero on error, -ERROR_NO_MEMORY on allocation failure
+  */
+int amqp_move_frame_pool(amqp_connection_state_t state, amqp_channel_t channel);
+
+
+/**
+  * Destroys all of the frame pools, both current, and cached, then emptys the pool_frame_pool
+  */
+void amqp_destroy_all_frame_pools(amqp_connection_state_t state);
+
+/**
+  * Initializes both the frame and decoding pool structures
+  */
+void amqp_init_all_pools(amqp_connection_state_t state);
+
+
+/**
+  * Destroys the frame and decoding pool structures
+  */
+void amqp_destroy_all_pools(amqp_connection_state_t state);
+
+#ifdef __cplusplus
+}
+#endif
 #endif

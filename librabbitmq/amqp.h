@@ -181,6 +181,8 @@ typedef struct amqp_pool_t_ {
   int next_page;
   char *alloc_block;
   size_t alloc_used;
+
+  struct amqp_pool_t_ *next;
 } amqp_pool_t;
 
 typedef struct amqp_method_t_ {
@@ -276,6 +278,8 @@ RABBITMQ_EXPORT amqp_boolean_t amqp_release_buffers_ok(
 RABBITMQ_EXPORT void amqp_release_buffers(amqp_connection_state_t state);
 
 RABBITMQ_EXPORT void amqp_maybe_release_buffers(amqp_connection_state_t state);
+
+RABBITMQ_EXPORT void amqp_maybe_release_buffers_for_channel(amqp_connection_state_t state, amqp_channel_t channel);
 
 RABBITMQ_EXPORT int amqp_send_frame(amqp_connection_state_t state,
 				    amqp_frame_t const *frame);

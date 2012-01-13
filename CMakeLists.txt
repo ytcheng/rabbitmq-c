@@ -65,11 +65,24 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(POPT)
 
+option(BUILD_SHARED_LIBS "Build rabbitmq as a shared library" ON)
+
 add_subdirectory(librabbitmq)
 add_subdirectory(examples)
 
 if (POPT_FOUND)
     add_subdirectory(tools)
 endif (POPT_FOUND)
+
+option(BUILD_TESTING "Enable unit tests" OFF)
+
+if (BUILD_TESTING)
+    if (BUILD_SHARED_LIBS)
+        message(FATAL_ERROR "Can only test when compiled statically, disable BUILD_SHARED_LIBS to enable testing")
+    endif (BUILD_SHARED_LIBS)
+
+    enable_testing()
+    add_subdirectory(tests)
+endif (BUILD_TESTING)
 
 add_subdirectory(third-party)

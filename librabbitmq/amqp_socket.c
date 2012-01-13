@@ -306,8 +306,19 @@ amqp_rpc_reply_t amqp_simple_rpc(amqp_connection_state_t state,
 	       ((frame.channel == 0) &&
 		(frame.payload.method.id == AMQP_CONNECTION_CLOSE_METHOD))   ) ))
     {
-      amqp_frame_t *frame_copy = amqp_pool_alloc(&state->decoding_pool, sizeof(amqp_frame_t));
-      amqp_link_t *link = amqp_pool_alloc(&state->decoding_pool, sizeof(amqp_link_t));
+      amqp_frame_t *frame_copy = NULL;
+      amqp_link_t *link = NULL;
+      amqp_pool_t* decoding_pool = amqp_get_decoding_pool(state, frame.channel);
+
+      if (decoding_pool == NULL)
+      {
+          result.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
+          result.library_error = ERROR_NO_MEMORY;
+          return result;
+      }
+
+      frame_copy = amqp_pool_alloc(decoding_pool, sizeof(amqp_frame_t));
+      link = amqp_pool_alloc(decoding_pool, sizeof(amqp_link_t));
 
       if (frame_copy == NULL || link == NULL) {
 	result.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
@@ -400,8 +411,14 @@ static int amqp_login_inner(amqp_connection_state_t state,
   {
     amqp_table_entry_t properties[2];
     amqp_connection_start_ok_t s;
-    amqp_bytes_t response_bytes = sasl_response(&state->decoding_pool,
-						sasl_method, vl);
+
+    amqp_bytes_t response_bytes;
+
+    amqp_pool_t* pool = amqp_get_decoding_pool(state, 0);
+    if (NULL == pool)
+        return -ERROR_NO_MEMORY;
+
+    response_bytes = sasl_response(pool, sasl_method, vl);
 
     if (response_bytes.bytes == NULL)
       return -ERROR_NO_MEMORY;

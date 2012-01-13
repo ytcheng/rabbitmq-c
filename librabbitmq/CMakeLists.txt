@@ -1,7 +1,5 @@
 project(librabbitmq "C")
 
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
 # Stuff dealing with code generation
 set(AMQP_CODEGEN_PY "${CMAKE_CURRENT_BINARY_DIR}/amqp_codegen.py")
 set(CODEGEN_PY "${CMAKE_CURRENT_BINARY_DIR}/codegen.py")
@@ -43,17 +41,34 @@ SET(CONFIG_CONTENTS "#define VERSION \"0.0.1\"
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/config.h" ${CONFIG_CONTENTS})
 
 if(WIN32)
-  set(SOCKET_IMPL "windows")
+    set(SOCKET_IMPL "${CMAKE_CURRENT_SOURCE_DIR}/windows")
 else(WIN32)
-  set(SOCKET_IMPL "unix")
+    set(SOCKET_IMPL "${CMAKE_CURRENT_SOURCE_DIR}/unix")
 endif(WIN32)
 
 if(MSVC)
   set(MSINTTYPES_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/../msinttypes")
 endif(MSVC)
 
-include_directories(${SOCKET_IMPL} ${MSINTTYPES_INCLUDE})
-add_definitions(-DBUILDING_LIBRABBITMQ)
+set(LIBRABBITMQ_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${SOCKET_IMPL}
+    ${MSINTTYPES_INCLUDE}
+    )
+
+include_directories(${LIBRABBITMQ_INCLUDE_DIRS})
+
+set(LIBRABBITMQ_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${SOCKET_IMPL}
+    ${MSINTTYPES_INCLUDE}
+    PARENT_SCOPE)
+
+if (BUILD_SHARED_LIBS)
+    add_definitions(-DBUILDING_LIBRABBITMQ)
+endif (BUILD_SHARED_LIBS)
 
 set(RABBITMQ_SOURCES
     ${CMAKE_CURRENT_BINARY_DIR}/amqp_framing.h
@@ -64,7 +79,7 @@ set(RABBITMQ_SOURCES
     ${SOCKET_IMPL}/socket.h ${SOCKET_IMPL}/socket.c
 )
 
-add_library(rabbitmq SHARED ${RABBITMQ_SOURCES})
+add_library(rabbitmq ${RABBITMQ_SOURCES})
 
 if(WIN32)
   target_link_libraries(rabbitmq ws2_32)
