@@ -72,3 +72,4 @@ if (POPT_FOUND)
     add_subdirectory(tools)
 endif (POPT_FOUND)
 
+add_subdirectory(third-party)
