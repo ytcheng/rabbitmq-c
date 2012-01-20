@@ -1,0 +1,42 @@
+# rabbitmq-c on OpenVMS
+
+This rabbitmq-c has been tested and appears to work on OpenVMS v8.3 on the 
+Alpha platform, with HP TCP/IP services v5.5
+running.  There is no reason to believe it won't work on OpenVMS v8.3 on 
+IA-64 (Itanium, a.k.a., Integrety) with an equivalent version of TCP/IP.
+Or an older version of either of these pieces of software.
+
+NOTE: building on OpenVMS is not currently supported by the RabbitMQ folks, as they don't
+have an OpenVMS box to build this thing on. (And likely won't in the near future).
+So with that in mind this package may require some tweaking to get it to compile.
+
+# Pre-reqs for building:
+- HP C compiler
+- Python (v2.5.1 tested). Must have simplejson or json package for python installed
+  (you can test this by starting python then trying to import json or import simplejson)
+- MMS or MMK
+
+# Instructions for building
+1. Extract this package somewhere where you have space.
+2. Get the rabbitmq-codegen package (http://hg.rabbitmq.com/rabbitmq-codegen/) 
+   (the rabbitmq-v2_5_1 tag tested, newer is likely to still work).
+3. Extract the rabbitmq-codegen sources in [.rabbitmq-codegen]
+4. Run mms or mmk to run the build
+5. The result of the build are a library and header files:
+  [.librabbitmq]rabbitmq.OLB for the library
+  [.librabbitmq]amqp.h and [.librabbitmq]amqp_framing.h for the header files.
+To build against the library put these in a place where your compiler/linker can find them
+
+# Other notes about the build:
+- The library is built using IEEE float with denormals enabled. This can be
+  adjusted by editing the OPTFLAGS line in [.vms]include.mms
+
+  NOTE: the library takes no special care to translate vax-floats into IEEE-floats
+   so if you plan on compiling the library with vax-floats enabled you'll need
+   to make some changes
+
+- The library is built using /NAMES=(UPPER,TRUNC). Adjust OPTFLAGS line in [.vms]include.mms
+  as necessary to get the desired size
+
+- The library is built using /POINTER=SHORT. Adjust OPTFLAGS line in [.vms]include.mms as
+  necessary to get the desired pointer size
