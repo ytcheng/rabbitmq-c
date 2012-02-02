@@ -36,7 +36,7 @@ To build against the library put these in a place where your compiler/linker can
    to make some changes
 
 - The library is built using /NAMES=(UPPER,TRUNC). Adjust OPTFLAGS line in [.vms]include.mms
-  as necessary to get the desired size
+  as necessary to get the desired naming scheme.
 
 - The library is built using /POINTER=SHORT. Adjust OPTFLAGS line in [.vms]include.mms as
   necessary to get the desired pointer size
