@@ -180,8 +180,6 @@ typedef struct amqp_pool_t_ {
   int next_page;
   char *alloc_block;
   size_t alloc_used;
-
-  struct amqp_pool_t_ *next;
 } amqp_pool_t;
 
 typedef struct amqp_method_t_ {

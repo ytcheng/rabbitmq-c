@@ -118,11 +118,17 @@ typedef struct amqp_link_t_ {
 
 #define AMQP_HASHTABLE_SIZE 256
 
+typedef struct amqp_pool_link_t_ {
+    amqp_pool_t pool;
+    struct amqp_pool_link_t_* next;
+} amqp_pool_link_t;
+
 typedef struct amqp_hashtable_entry_t_ {
     struct amqp_hashtable_entry_t_ *next;
-    amqp_pool_t data;
+    amqp_pool_link_t data;
     amqp_channel_t key;
 } amqp_hashtable_entry_t;
+
 
 typedef struct amqp_hashtable_t_ {
     amqp_hashtable_entry_t* entries[AMQP_HASHTABLE_SIZE];
@@ -168,8 +174,8 @@ typedef struct amqp_hashtable_t_ {
 struct amqp_connection_state_t_ {
   amqp_pool_t pool_cache_pool;
 
-  amqp_pool_t *frame_pool;
-  amqp_pool_t *frame_pool_cache;
+  amqp_pool_link_t *frame_pool;
+  amqp_pool_link_t *frame_pool_cache;
 
   amqp_hashtable_t decoding_pools;
 
@@ -349,7 +355,7 @@ void amqp_hashtable_init(amqp_hashtable_t* table);
   *  - the amqp_channel_t already exists in the hashtable
   *  - memory allocation fails
   */
-amqp_pool_t* amqp_hashtable_add_pool(amqp_hashtable_t* table, amqp_channel_t channel);
+amqp_pool_link_t* amqp_hashtable_add_pool(amqp_hashtable_t* table, amqp_channel_t channel);
 
 /**
   * Gets a pool from the hashtable with the given channel as a key
@@ -361,9 +367,9 @@ amqp_pool_t* amqp_hashtable_add_pool(amqp_hashtable_t* table, amqp_channel_t cha
   * Will return NULL if:
   *  - the key does not exist in the hash table
   */
-amqp_pool_t* amqp_hashtable_get_pool(amqp_hashtable_t* table, amqp_channel_t channel);
+amqp_pool_link_t* amqp_hashtable_get_pool(amqp_hashtable_t* table, amqp_channel_t channel);
 
-void amqp_recycle_decoding_pool_inner(amqp_connection_state_t state, amqp_pool_t* decoding_pool);
+void amqp_recycle_decoding_pool_inner(amqp_connection_state_t state, amqp_pool_link_t* decoding_pool);
 
 /**
   * Gets the decoding pool for a specified channel, allocating if it doesn't exist
@@ -374,6 +380,8 @@ void amqp_recycle_decoding_pool_inner(amqp_connection_state_t state, amqp_pool_t
   * The pool should be recycled using the amqp_recycle_channel_pool or amqp_recycle_all_channel_pools function
   * All pools associated with the decoding pool structure can be destroyed with amqp_destroy_all_channel_pools
   */
+amqp_pool_link_t* amqp_get_decoding_pool_link(amqp_connection_state_t state, amqp_channel_t channel);
+
 amqp_pool_t* amqp_get_decoding_pool(amqp_connection_state_t state, amqp_channel_t channel);
 
 /**
@@ -404,6 +412,8 @@ void amqp_destroy_all_decoding_pools(amqp_connection_state_t state);
  *  If the cache is empty it creates a new one
  * Will return NULL on a out of memory condition
  */
+amqp_pool_link_t* amqp_get_frame_pool_link(amqp_connection_state_t state);
+
 amqp_pool_t* amqp_get_frame_pool(amqp_connection_state_t state);
 
 /**
