@@ -1,3 +1,4 @@
+project(testing C CXX)
 
 include_directories(${LIBRABBITMQ_INCLUDE_DIRS})
 
