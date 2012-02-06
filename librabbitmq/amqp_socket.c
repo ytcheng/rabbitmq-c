@@ -312,9 +312,9 @@ amqp_rpc_reply_t amqp_simple_rpc(amqp_connection_state_t state,
 
       if (decoding_pool == NULL)
       {
-          result.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
-          result.library_error = ERROR_NO_MEMORY;
-          return result;
+        result.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
+        result.library_error = ERROR_NO_MEMORY;
+        return result;
       }
 
       frame_copy = amqp_pool_alloc(decoding_pool, sizeof(amqp_frame_t));
@@ -416,7 +416,7 @@ static int amqp_login_inner(amqp_connection_state_t state,
 
     amqp_pool_t* pool = amqp_get_decoding_pool(state, 0);
     if (NULL == pool)
-        return -ERROR_NO_MEMORY;
+      return -ERROR_NO_MEMORY;
 
     response_bytes = sasl_response(pool, sasl_method, vl);
 

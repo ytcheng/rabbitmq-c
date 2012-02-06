@@ -197,18 +197,18 @@ int amqp_handle_input(amqp_connection_state_t state,
     if (state->frame_pool == NULL) {
 	  return -ERROR_NO_MEMORY;
 	}
-	/* We can recycle here because:
-	  - Methods data is copied to the decoding_pool
-	  - Property data is copied to the decoding_pool
+    /* We can recycle here because:
+      - Methods data is copied to the decoding_pool
+      - Property data is copied to the decoding_pool
       - Body data, the pool is moved to the decoding_pools structure
-	  */
-	recycle_amqp_pool(frame_pool);
+    */
+    recycle_amqp_pool(frame_pool);
     state->inbound_buffer.bytes = amqp_pool_alloc(frame_pool,
-						  state->inbound_buffer.len);
+      state->inbound_buffer.len);
     if (state->inbound_buffer.bytes == NULL)
       /* state->inbound_buffer.len is always nonzero, because it
-	 corresponds to frame_max, which is not permitted to be less
-	 than AMQP_FRAME_MIN_SIZE (currently 4096 bytes). */
+      corresponds to frame_max, which is not permitted to be less
+      than AMQP_FRAME_MIN_SIZE (currently 4096 bytes). */
       return -ERROR_NO_MEMORY;
 
     state->state = CONNECTION_STATE_HEADER;
@@ -363,23 +363,23 @@ void amqp_maybe_release_buffers(amqp_connection_state_t state) {
 }
 
 void amqp_maybe_release_buffers_for_channel(amqp_connection_state_t state, amqp_channel_t channel) {
-	// To release buffers for a channel
-    if (state->state == CONNECTION_STATE_IDLE)
-    {
-        amqp_link_t* last_frame_ptr = state->first_queued_frame;
+  // To release buffers for a channel
+  if (state->state == CONNECTION_STATE_IDLE)
+  {
+    amqp_link_t* last_frame_ptr = state->first_queued_frame;
 
-        last_frame_ptr = state->first_queued_frame;
-        while (last_frame_ptr != NULL)
-        {
-            amqp_frame_t* frame = (amqp_frame_t*)last_frame_ptr->data;
-            if (frame->channel == channel)
-            {
-                return;
-            }
-            last_frame_ptr = last_frame_ptr->next;
-        }
-        amqp_recycle_decoding_pool(state, channel);
+    last_frame_ptr = state->first_queued_frame;
+    while (last_frame_ptr != NULL)
+    {
+      amqp_frame_t* frame = (amqp_frame_t*)last_frame_ptr->data;
+      if (frame->channel == channel)
+      {
+        return;
+      }
+      last_frame_ptr = last_frame_ptr->next;
     }
+    amqp_recycle_decoding_pool(state, channel);
+  }
 }
 
 int amqp_send_frame(amqp_connection_state_t state,

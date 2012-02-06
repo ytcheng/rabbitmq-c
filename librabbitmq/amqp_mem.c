@@ -192,277 +192,250 @@ void amqp_bytes_free(amqp_bytes_t bytes) {
   free(bytes.bytes);
 }
 
-amqp_pool_t* amqp_get_frame_pool(amqp_connection_state_t state)
-{
-    int page_size = (0 == state->frame_max ? INITIAL_FRAME_POOL_PAGE_SIZE : state->frame_max);
+amqp_pool_t* amqp_get_frame_pool(amqp_connection_state_t state) {
+  int page_size = (0 == state->frame_max ? INITIAL_FRAME_POOL_PAGE_SIZE 
+                                         : state->frame_max);
 
-    assert(NULL != state);
+  assert(NULL != state);
 
-	if (NULL != state->frame_pool)
-		return state->frame_pool;
+  if (NULL != state->frame_pool)
+    return state->frame_pool;
 
-    if (NULL != state->frame_pool_cache)
-    {
-		state->frame_pool = state->frame_pool_cache;
-		state->frame_pool_cache = state->frame_pool->next;
-		state->frame_pool->next = NULL;
+  if (NULL != state->frame_pool_cache) {
+    state->frame_pool = state->frame_pool_cache;
+    state->frame_pool_cache = state->frame_pool->next;
+    state->frame_pool->next = NULL;
 
-        if (state->frame_pool->pagesize != page_size)
-        {
-            empty_amqp_pool(state->frame_pool);
-            init_amqp_pool(state->frame_pool, page_size);
-        }
-		return state->frame_pool;
+    if (state->frame_pool->pagesize != page_size) {
+      empty_amqp_pool(state->frame_pool);
+      init_amqp_pool(state->frame_pool, page_size);
     }
+    return state->frame_pool;
+  }
 
-	state->frame_pool = (amqp_pool_t*)amqp_pool_alloc(&state->pool_cache_pool, sizeof(amqp_pool_t));
+  state->frame_pool = (amqp_pool_t*)amqp_pool_alloc(&state->pool_cache_pool, 
+                                                    sizeof(amqp_pool_t));
 
-	if (NULL == state->frame_pool)
-        return NULL;
-
-	init_amqp_pool(state->frame_pool, page_size);
-
-	return state->frame_pool;
-}
-
-int amqp_move_frame_pool(amqp_connection_state_t state, amqp_channel_t channel)
-{
-    amqp_pool_t* decoding_pool = NULL;
-    amqp_pool_t* frame_pool = NULL;
-
-    decoding_pool = amqp_get_decoding_pool(state, channel);
-    if (NULL == decoding_pool)
-    {
-        return -ERROR_NO_MEMORY;
-    }
-
-    frame_pool = amqp_get_frame_pool(state);
-    if (NULL == frame_pool)
-    {
-        return -ERROR_NO_MEMORY;
-    }
-
-    state->frame_pool = NULL;
-
-    frame_pool->next = decoding_pool->next;
-    decoding_pool->next = frame_pool;
-
-    return 0;
-}
-
-void amqp_destroy_all_frame_pools(amqp_connection_state_t state)
-{
-    amqp_pool_t* frame_pool = NULL;
-
-    assert(NULL != state);
-
-    if (NULL != state->frame_pool)
-    {
-        empty_amqp_pool(state->frame_pool);
-    }
-
-    for (frame_pool = state->frame_pool_cache;
-         NULL != frame_pool;
-         frame_pool = frame_pool->next)
-    {
-        empty_amqp_pool(frame_pool);
-    }
-
-    empty_amqp_pool(&state->pool_cache_pool);
-}
-
-int amqp_hashtable_channel_hash(amqp_channel_t channel)
-{
-    return channel % AMQP_HASHTABLE_SIZE;
-}
-
-void amqp_hashtable_init(amqp_hashtable_t* table)
-{
-    assert(NULL != table);
-
-    memset(table, 0, sizeof(amqp_hashtable_t));
-}
-
-amqp_pool_t* amqp_hashtable_get_pool(amqp_hashtable_t* table, amqp_channel_t channel)
-{
-    amqp_hashtable_entry_t* entry = NULL;
-    int index = 0;
-
-    assert(NULL != table);
-
-    index = amqp_hashtable_channel_hash(channel);
-
-    assert(AMQP_HASHTABLE_SIZE > index);
-    entry = table->entries[index];
-
-    while (NULL != entry)
-    {
-        if (channel == entry->key)
-        {
-            return &entry->data;
-        }
-
-        entry = entry->next;
-    }
-
+  if (NULL == state->frame_pool)
     return NULL;
+
+  init_amqp_pool(state->frame_pool, page_size);
+
+  return state->frame_pool;
 }
 
-amqp_pool_t* amqp_hashtable_add_pool(amqp_hashtable_t* table, amqp_channel_t channel)
-{
-    amqp_hashtable_entry_t* new_entry = NULL;
-    int index = 0;
+int amqp_move_frame_pool(amqp_connection_state_t state, amqp_channel_t channel) {
+  amqp_pool_t* decoding_pool = NULL;
+  amqp_pool_t* frame_pool = NULL;
 
-    assert(NULL != table);
+  decoding_pool = amqp_get_decoding_pool(state, channel);
+  if (NULL == decoding_pool) {
+    return -ERROR_NO_MEMORY;
+  }
 
-    if (NULL != amqp_hashtable_get_pool(table, channel))
-    {
-      return NULL;
-    }
+  frame_pool = amqp_get_frame_pool(state);
+  if (NULL == frame_pool) {
+    return -ERROR_NO_MEMORY;
+  }
 
-    index = amqp_hashtable_channel_hash(channel);
-    assert(AMQP_HASHTABLE_SIZE > index);
+  state->frame_pool = NULL;
 
-    new_entry = (amqp_hashtable_entry_t*)malloc(sizeof(amqp_hashtable_entry_t));
-    if (NULL == new_entry)
-    {
-        return NULL;
-    }
-    memset(new_entry, 0, sizeof(amqp_hashtable_entry_t));
-    new_entry->key = channel;
-    new_entry->next = table->entries[index];
-    table->entries[index] = new_entry;
+  frame_pool->next = decoding_pool->next;
+  decoding_pool->next = frame_pool;
 
-    return &new_entry->data;
+  return 0;
 }
 
-amqp_pool_t* amqp_get_decoding_pool(amqp_connection_state_t state, amqp_channel_t channel)
-{
-    amqp_pool_t* pool = NULL;
+void amqp_destroy_all_frame_pools(amqp_connection_state_t state) {
+  amqp_pool_t* frame_pool = NULL;
 
-    assert(NULL != state);
+  assert(NULL != state);
 
-    // Try to get the decoding pool
-    pool = amqp_hashtable_get_pool(&state->decoding_pools, channel);
+  if (NULL != state->frame_pool) {
+    empty_amqp_pool(state->frame_pool);
+  }
 
-    if (NULL == pool)
-    {
-        pool = amqp_hashtable_add_pool(&state->decoding_pools, channel);
-        init_amqp_pool(pool, INITIAL_DECODING_POOL_PAGE_SIZE);
-    }
-    return pool;
+  for (frame_pool = state->frame_pool_cache;
+    NULL != frame_pool;
+    frame_pool = frame_pool->next) {
+    empty_amqp_pool(frame_pool);
+  }
+
+  empty_amqp_pool(&state->pool_cache_pool);
 }
 
-void amqp_recycle_decoding_pool_inner(amqp_connection_state_t state, amqp_pool_t* decoding_pool)
-{
-    amqp_pool_t* frame_pool = NULL;
-    amqp_pool_t* last_frame_pool = NULL;
-
-    assert(NULL != state);
-    assert(NULL != decoding_pool);
-
-    recycle_amqp_pool(decoding_pool);
-
-
-    if (NULL != decoding_pool->next)
-    {
-        frame_pool = decoding_pool->next;
-        for (frame_pool = decoding_pool->next;
-             NULL != frame_pool;
-             last_frame_pool = frame_pool, frame_pool = frame_pool->next)
-        {
-            recycle_amqp_pool(frame_pool);
-        }
-
-        last_frame_pool->next = state->frame_pool_cache;
-        state->frame_pool_cache = decoding_pool->next;
-        decoding_pool->next = NULL;
-    }
+int amqp_hashtable_channel_hash(amqp_channel_t channel) {
+  return channel % AMQP_HASHTABLE_SIZE;
 }
 
-void amqp_recycle_decoding_pool(amqp_connection_state_t state, amqp_channel_t channel)
-{
-    amqp_pool_t* decoding_pool = NULL;
+void amqp_hashtable_init(amqp_hashtable_t* table) {
+  assert(NULL != table);
 
-    assert(NULL != state);
+  memset(table, 0, sizeof(amqp_hashtable_t));
+}
 
-    decoding_pool = amqp_get_decoding_pool(state, channel);
+amqp_pool_t* amqp_hashtable_get_pool(amqp_hashtable_t* table, 
+                                     amqp_channel_t channel) {
+  amqp_hashtable_entry_t* entry = NULL;
+  int index = 0;
 
-    if (NULL == decoding_pool)
-    {
-        return;
+  assert(NULL != table);
+
+  index = amqp_hashtable_channel_hash(channel);
+
+  assert(AMQP_HASHTABLE_SIZE > index);
+  entry = table->entries[index];
+
+  while (NULL != entry) {
+    if (channel == entry->key) {
+      return &entry->data;
     }
 
-    amqp_recycle_decoding_pool_inner(state, decoding_pool);
+    entry = entry->next;
+  }
+
+  return NULL;
+}
+
+amqp_pool_t* amqp_hashtable_add_pool(amqp_hashtable_t* table, 
+                                     amqp_channel_t channel) {
+amqp_hashtable_entry_t* new_entry = NULL;
+  int index = 0;
+
+  assert(NULL != table);
+
+  if (NULL != amqp_hashtable_get_pool(table, channel)) {
+    return NULL;
+  }
+
+  index = amqp_hashtable_channel_hash(channel);
+  assert(AMQP_HASHTABLE_SIZE > index);
+
+  new_entry = (amqp_hashtable_entry_t*)malloc(sizeof(amqp_hashtable_entry_t));
+  if (NULL == new_entry) {
+    return NULL;
+  }
+  memset(new_entry, 0, sizeof(amqp_hashtable_entry_t));
+  new_entry->key = channel;
+  new_entry->next = table->entries[index];
+  table->entries[index] = new_entry;
+
+  return &new_entry->data;
+}
+
+amqp_pool_t* amqp_get_decoding_pool(amqp_connection_state_t state,
+                                    amqp_channel_t channel) {
+  amqp_pool_t* pool = NULL;
+
+  assert(NULL != state);
+
+  // Try to get the decoding pool
+  pool = amqp_hashtable_get_pool(&state->decoding_pools, channel);
+
+  if (NULL == pool) {
+    pool = amqp_hashtable_add_pool(&state->decoding_pools, channel);
+    init_amqp_pool(pool, INITIAL_DECODING_POOL_PAGE_SIZE);
+  }
+  return pool;
+}
+
+void amqp_recycle_decoding_pool_inner(amqp_connection_state_t state,
+                                      amqp_pool_t* decoding_pool) {
+  amqp_pool_t* frame_pool = NULL;
+  amqp_pool_t* last_frame_pool = NULL;
+
+  assert(NULL != state);
+  assert(NULL != decoding_pool);
+
+  recycle_amqp_pool(decoding_pool);
+
+
+  if (NULL != decoding_pool->next) {
+    frame_pool = decoding_pool->next;
+    for (frame_pool = decoding_pool->next;
+      NULL != frame_pool;
+      last_frame_pool = frame_pool, frame_pool = frame_pool->next) {
+      recycle_amqp_pool(frame_pool);
+    }
+
+    last_frame_pool->next = state->frame_pool_cache;
+    state->frame_pool_cache = decoding_pool->next;
+    decoding_pool->next = NULL;
+  }
+}
+
+void amqp_recycle_decoding_pool(amqp_connection_state_t state, 
+                                amqp_channel_t channel) {
+  amqp_pool_t* decoding_pool = NULL;
+
+  assert(NULL != state);
+
+  decoding_pool = amqp_get_decoding_pool(state, channel);
+
+  if (NULL == decoding_pool) {
+    return;
+  }
+
+  amqp_recycle_decoding_pool_inner(state, decoding_pool);
 }
 
 void amqp_recycle_all_decoding_pools(amqp_connection_state_t state)
 {
-    int i = 0;
-    assert(NULL != state);
+  int i = 0;
+  assert(NULL != state);
 
-    for (i = 0; i < AMQP_HASHTABLE_SIZE; ++i)
-    {
-        if (NULL != state->decoding_pools.entries[i])
-        {
-            amqp_hashtable_entry_t* entry = state->decoding_pools.entries[i];
-            for ( ; entry != NULL; entry = entry->next)
-            {
-                amqp_recycle_decoding_pool_inner(state, &entry->data);
-            }
-        }
+  for (i = 0; i < AMQP_HASHTABLE_SIZE; ++i) {
+    if (NULL != state->decoding_pools.entries[i]) {
+      amqp_hashtable_entry_t* entry = state->decoding_pools.entries[i];
+      for ( ; entry != NULL; entry = entry->next) {
+        amqp_recycle_decoding_pool_inner(state, &entry->data);
+      }
     }
+  }
 }
 
-void amqp_destroy_all_decoding_pools(amqp_connection_state_t state)
-{
-    int i = 0;
-    assert(NULL != state);
-    for (i = 0; i < AMQP_HASHTABLE_SIZE; ++i)
-    {
-        if (NULL != state->decoding_pools.entries[i])
-        {
-            amqp_hashtable_entry_t* entry = state->decoding_pools.entries[i];
-            while (entry != NULL)
-            {
-                amqp_hashtable_entry_t* last_entry = NULL;
-                amqp_pool_t* decoding_pool = &entry->data;
-                amqp_pool_t* last_frame_pool = NULL;
+void amqp_destroy_all_decoding_pools(amqp_connection_state_t state) {
+  int i = 0;
+  assert(NULL != state);
+  for (i = 0; i < AMQP_HASHTABLE_SIZE; ++i) {
+    if (NULL != state->decoding_pools.entries[i]) {
+      amqp_hashtable_entry_t* entry = state->decoding_pools.entries[i];
+      while (entry != NULL) {
+        amqp_hashtable_entry_t* last_entry = NULL;
+        amqp_pool_t* decoding_pool = &entry->data;
+        amqp_pool_t* last_frame_pool = NULL;
 
-                empty_amqp_pool(decoding_pool);
+        empty_amqp_pool(decoding_pool);
 
-                if (NULL != decoding_pool->next)
-                {
-                    last_frame_pool = decoding_pool->next;
+        if (NULL != decoding_pool->next) {
+          last_frame_pool = decoding_pool->next;
 
-                    for (last_frame_pool = decoding_pool->next;
-                         NULL != last_frame_pool->next;
-                         last_frame_pool = last_frame_pool->next) { /* empty */ }
+          for (last_frame_pool = decoding_pool->next;
+            NULL != last_frame_pool->next;
+            last_frame_pool = last_frame_pool->next) { /* empty */ }
 
-                    last_frame_pool->next = state->frame_pool_cache;
-                    state->frame_pool_cache = decoding_pool->next;
-                    decoding_pool->next = NULL;
-                }
-
-                last_entry = entry->next;
-                free(entry);
-                entry = last_entry;
-            }
+          last_frame_pool->next = state->frame_pool_cache;
+          state->frame_pool_cache = decoding_pool->next;
+          decoding_pool->next = NULL;
         }
+
+        last_entry = entry->next;
+        free(entry);
+        entry = last_entry;
+      }
     }
+  }
 }
 
-void amqp_init_all_pools(amqp_connection_state_t state)
-{
-    state->frame_pool = NULL;
-    state->frame_pool_cache = NULL;
-    state->frame_max = 0;
-    init_amqp_pool(&state->pool_cache_pool, sizeof(amqp_pool_t)*16);
-    amqp_hashtable_init(&state->decoding_pools);
+void amqp_init_all_pools(amqp_connection_state_t state) {
+  state->frame_pool = NULL;
+  state->frame_pool_cache = NULL;
+  state->frame_max = 0;
+  init_amqp_pool(&state->pool_cache_pool, sizeof(amqp_pool_t)*16);
+  amqp_hashtable_init(&state->decoding_pools);
 }
 
-void amqp_destroy_all_pools(amqp_connection_state_t state)
-{
-    amqp_destroy_all_decoding_pools(state);
-    amqp_destroy_all_frame_pools(state);
+void amqp_destroy_all_pools(amqp_connection_state_t state) {
+  amqp_destroy_all_decoding_pools(state);
+  amqp_destroy_all_frame_pools(state);
 }
