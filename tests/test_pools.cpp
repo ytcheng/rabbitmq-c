@@ -1,3 +1,7 @@
+#ifdef _MSC_VER
+# define NOMINMAX
+#endif
+
 #include "amqp_mem.c"
 
 #include <gtest/gtest.h>
