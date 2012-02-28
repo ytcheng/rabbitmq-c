@@ -14,7 +14,7 @@ add_test(tables test_tables)
 set_tests_properties(tables PROPERTIES ENVIRONMENT srcdir=${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_hashtable test_hashtable.cpp)
-target_link_libraries(test_hashtable rabbitmq gtest_main gtest)
+target_link_libraries(test_hashtable gtest_main gtest)
 add_test(hashtable test_hashtable)
 
 add_executable(test_pools test_pools.cpp)

@@ -97,14 +97,14 @@ static int record_pool_block(amqp_pool_blocklist_t *x, void *block) {
   size_t blocklistlength = sizeof(void *) * (x->num_blocks + 1);
 
   if (x->blocklist == NULL) {
-    x->blocklist = malloc(blocklistlength);
+    x->blocklist = (void**)malloc(blocklistlength);
     if (x->blocklist == NULL)
       return 0;
   } else {
     void *newbl = realloc(x->blocklist, blocklistlength);
     if (newbl == NULL)
       return 0;
-    x->blocklist = newbl;
+    x->blocklist = (void**)newbl;
   }
 
   x->blocklist[x->num_blocks] = block;
@@ -140,7 +140,7 @@ void *amqp_pool_alloc(amqp_pool_t *pool, size_t amount) {
   }
 
   if (pool->next_page >= pool->pages.num_blocks) {
-    pool->alloc_block = calloc(1, pool->pagesize);
+    pool->alloc_block = (char*)calloc(1, pool->pagesize);
     if (pool->alloc_block == NULL) {
       return NULL;
     }
@@ -148,7 +148,7 @@ void *amqp_pool_alloc(amqp_pool_t *pool, size_t amount) {
       return NULL;
     pool->next_page = pool->pages.num_blocks;
   } else {
-    pool->alloc_block = pool->pages.blocklist[pool->next_page];
+    pool->alloc_block = (char*)pool->pages.blocklist[pool->next_page];
     pool->next_page++;
   }
 
