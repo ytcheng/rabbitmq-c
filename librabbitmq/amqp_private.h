@@ -66,6 +66,13 @@
 
 #include "socket.h"
 
+#include <stdlib.h>
+
+#define AMQP_MALLOC(type) (type*)malloc(sizeof(type))
+#define AMQP_MALLOC_ARRAY(type, size) (type*)malloc(sizeof(type) * size)
+
+#define AMQP_SAFE_POOL_ALLOC(pool, type) (type*)amqp_pool_alloc(pool, sizeof(type))
+
 #ifdef __cplusplus
 extern "C" {
 #endif

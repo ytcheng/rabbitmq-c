@@ -211,8 +211,8 @@ static amqp_pool_link_t* amqp_get_frame_pool_link(amqp_connection_state_t state)
     return state->frame_pool;
   }
 
-  state->frame_pool = (amqp_pool_link_t*)amqp_pool_alloc(&state->pool_cache_pool, 
-                                                    sizeof(amqp_pool_link_t));
+  state->frame_pool = AMQP_SAFE_POOL_ALLOC(&state->pool_cache_pool, 
+                                           amqp_pool_link_t);
 
   if (NULL == state->frame_pool)
     return NULL;
@@ -321,7 +321,7 @@ amqp_hashtable_entry_t* new_entry = NULL;
   index = amqp_hashtable_channel_hash(channel);
   assert(AMQP_HASHTABLE_SIZE > index);
 
-  new_entry = (amqp_hashtable_entry_t*)malloc(sizeof(amqp_hashtable_entry_t));
+  new_entry = AMQP_MALLOC(amqp_hashtable_entry_t);
   if (NULL == new_entry) {
     return NULL;
   }
