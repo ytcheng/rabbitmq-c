@@ -49,7 +49,7 @@ extern "C" {
 #ifdef BUILDING_LIBRABBITMQ
 #define RABBITMQ_EXPORT extern __declspec(dllexport)
 #else
-#define RABBITMQ_EXPORT extern __declspec(dllimport)
+#define RABBITMQ_EXPORT extern 
 #endif
 #else
 #define RABBITMQ_EXPORT extern
