@@ -1,5 +1,6 @@
 project(gtest CXX)
 
+set(gtest_force_shared_crt ON)
 include(cmake/internal_utils.cmake)
 
 config_compiler_and_linker()
