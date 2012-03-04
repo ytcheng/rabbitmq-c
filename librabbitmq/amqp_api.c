@@ -118,7 +118,7 @@ int amqp_basic_publish(amqp_connection_state_t state,
   size_t usable_body_payload_size = state->frame_max - (HEADER_SIZE + FOOTER_SIZE);
   int res;
 
-  amqp_basic_publish_t m;
+  amqp_basic_publish_t m = {};
   amqp_basic_properties_t default_properties;
 
   m.exchange = exchange;
