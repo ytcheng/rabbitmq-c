@@ -197,12 +197,6 @@ int amqp_handle_input(amqp_connection_state_t state,
     if (state->frame_pool == NULL) {
 	  return -ERROR_NO_MEMORY;
 	}
-    /* We can recycle here because:
-      - Methods data is copied to the decoding_pool
-      - Property data is copied to the decoding_pool
-      - Body data, the pool is moved to the decoding_pools structure
-    */
-    recycle_amqp_pool(frame_pool);
     state->inbound_buffer.bytes = amqp_pool_alloc(frame_pool,
       state->inbound_buffer.len);
     if (state->inbound_buffer.bytes == NULL)
@@ -286,7 +280,10 @@ int amqp_handle_input(amqp_connection_state_t state,
                    decoding_pool, encoded,
 			       &decoded_frame->payload.method.decoded);
       if (res < 0)
-	return res;
+        return res;
+    /* Move ownership of the pool to the channel hashmap */
+      if (0 != amqp_move_frame_pool(state, decoded_frame->channel))
+          return -ERROR_NO_MEMORY;
 
       break;
 
@@ -309,6 +306,10 @@ int amqp_handle_input(amqp_connection_state_t state,
                                    &decoded_frame->payload.properties.decoded);
       if (res < 0)
         return res;
+
+    /* Move ownership of the pool to the channel hashmap */
+      if (0 != amqp_move_frame_pool(state, decoded_frame->channel))
+          return -ERROR_NO_MEMORY;
 
       break;
 
