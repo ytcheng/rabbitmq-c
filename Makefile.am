@@ -6,6 +6,8 @@ lib_LTLIBRARIES = librabbitmq/librabbitmq.la
 
 librabbitmq_librabbitmq_la_SOURCES = \
 	librabbitmq/amqp_api.c \
+	librabbitmq/amqp_channel_pools.c \
+	librabbitmq/amqp_channel_pools.h \
 	librabbitmq/amqp_connection.c \
 	librabbitmq/amqp_framing.c \
 	librabbitmq/amqp_mem.c \

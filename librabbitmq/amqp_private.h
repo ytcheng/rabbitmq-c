@@ -38,6 +38,7 @@
 #endif
 
 #include "amqp.h"
+#include "amqp_channel_pools.h"
 #include "amqp_framing.h"
 #include <string.h>
 
@@ -124,9 +125,8 @@ typedef struct amqp_link_t_ {
 } amqp_link_t;
 
 struct amqp_connection_state_t_ {
-  amqp_pool_t frame_pool;
-  amqp_pool_t decoding_pool;
-
+  amqp_channel_pools_t channel_pools;
+    
   amqp_connection_state_enum state;
 
   int channel_max;
@@ -149,6 +149,7 @@ struct amqp_connection_state_t_ {
 
   amqp_rpc_reply_t most_recent_api_result;
 };
+
 
 static inline void *amqp_offset(void *data, size_t offset)
 {

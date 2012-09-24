@@ -226,12 +226,16 @@ int amqp_simple_wait_frame(amqp_connection_state_t state,
 			   amqp_frame_t *decoded_frame)
 {
   if (state->first_queued_frame != NULL) {
-    amqp_frame_t *f = (amqp_frame_t *) state->first_queued_frame->data;
+    amqp_link_t *l = (amqp_link_t *) state->first_queued_frame;
+    amqp_frame_t *f = (amqp_frame_t *) l->data;
+
     state->first_queued_frame = state->first_queued_frame->next;
     if (state->first_queued_frame == NULL) {
       state->last_queued_frame = NULL;
     }
     *decoded_frame = *f;
+    free(f);
+    free(l);
     return 0;
   } else {
     return wait_frame_inner(state, decoded_frame);
@@ -335,8 +339,8 @@ amqp_rpc_reply_t amqp_simple_rpc(amqp_connection_state_t state,
 	       ((frame.channel == 0) &&
 		(frame.payload.method.id == AMQP_CONNECTION_CLOSE_METHOD))   ) ))
     {
-      amqp_frame_t *frame_copy = amqp_pool_alloc(&state->decoding_pool, sizeof(amqp_frame_t));
-      amqp_link_t *link = amqp_pool_alloc(&state->decoding_pool, sizeof(amqp_link_t));
+      amqp_frame_t *frame_copy = malloc(sizeof(amqp_frame_t));
+      amqp_link_t *link = malloc(sizeof(amqp_link_t));
 
       if (frame_copy == NULL || link == NULL) {
 	result.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
@@ -429,9 +433,12 @@ static int amqp_login_inner(amqp_connection_state_t state,
   {
     amqp_table_entry_t properties[2];
     amqp_connection_start_ok_t s;
-    amqp_bytes_t response_bytes = sasl_response(&state->decoding_pool,
-						sasl_method, vl);
+    amqp_bytes_t response_bytes;
+    amqp_pool_t *pool = amqp_channel_pools_get(&state->channel_pools);
+    if (NULL == pool)
+      return -ERROR_NO_MEMORY;
 
+    response_bytes = sasl_response(pool, sasl_method, vl);
     if (response_bytes.bytes == NULL)
       return -ERROR_NO_MEMORY;
 
