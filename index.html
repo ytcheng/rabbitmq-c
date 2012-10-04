@@ -1,0 +1,188 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>rabbitmq-c by alanxz</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>rabbitmq-c</h1>
+        <p>C client library for the RabbitMQ broker</p>
+
+        <p class="view"><a href="https://github.com/alanxz/rabbitmq-c">View the Project on GitHub <small>alanxz/rabbitmq-c</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/alanxz/rabbitmq-c/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/alanxz/rabbitmq-c/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/alanxz/rabbitmq-c">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>RabbitMQ C AMQP client library</h1>
+
+<p><a href="http://travis-ci.org/alanxz/rabbitmq-c"><img src="https://secure.travis-ci.org/alanxz/rabbitmq-c.png?branch=master" alt="Build Status"></a></p>
+
+<h2>Introduction</h2>
+
+<p>This is a C-language AMQP client library for use with AMQP servers
+speaking protocol versions 0-9-1.</p>
+
+<ul>
+<li><a href="http://www.rabbitmq.com/">http://www.rabbitmq.com/</a></li>
+<li><a href="http://www.amqp.org/">http://www.amqp.org/</a></li>
+<li><a href="http://github.com/alanxz/rabbitmq-c">http://github.com/alanxz/rabbitmq-c</a></li>
+</ul><p>Announcements regarding the library are periodically made on the
+RabbitMQ mailing list and on the RabbitMQ blog.</p>
+
+<ul>
+<li><a href="http://lists.rabbitmq.com/cgi-bin/mailman/listinfo/rabbitmq-discuss">http://lists.rabbitmq.com/cgi-bin/mailman/listinfo/rabbitmq-discuss</a></li>
+<li><a href="http://www.rabbitmq.com/blog/">http://www.rabbitmq.com/blog/</a></li>
+</ul><h2>Retrieving the code</h2>
+
+<p>In addition to the source code for this library, you will require a
+copy of <code>rabbitmq-codegen</code>, which resides in the <code>codegen</code> directory
+as a git submodule. To update the submodule(s):</p>
+
+<pre><code>git clone git://github.com/alanxz/rabbitmq-c.git
+cd rabbitmq-c
+git submodule init
+git submodule update
+</code></pre>
+
+<p>You will also need a recent python with the simplejson module
+installed, and the GNU autotools (autoconf, automake, libtool etc.),
+or as an alternative CMake.</p>
+
+<h2>Building the code</h2>
+
+<h3>Using autoconf</h3>
+
+<p>Once you have all the prerequisites, change to the <code>rabbitmq-c</code>
+directory and run</p>
+
+<pre><code>autoreconf -i
+</code></pre>
+
+<p>to run the GNU autotools and generate the configure script, followed
+by</p>
+
+<pre><code>./configure
+make
+</code></pre>
+
+<p>to build the <code>librabbitmq</code> library and the example programs.</p>
+
+<h3>Using cmake</h3>
+
+<p>You will need CMake (v2.6 or better): <a href="http://cmake.org/">http://cmake.org/</a></p>
+
+<p>You will need a working python install (2.6+) with the json or simplejson
+modules installed.</p>
+
+<p>You will need to do the git submodule init/update as above.
+Alternatively you can clone the rabbitmq-codegen repository and point
+cmake to it using the RABBITMQ_CODEGEN_DIR cmake variable</p>
+
+<p>Create a binary directory in a sibling directory from the directory
+you cloned the rabbitmq-c repository</p>
+
+<pre><code>mkdir bin-rabbitmq-c
+</code></pre>
+
+<p>Run CMake in the binary directory</p>
+
+<pre><code>cmake /path/to/source/directory
+</code></pre>
+
+<p>Build it:</p>
+
+<ul>
+<li>On linux: <code>make</code>
+</li>
+<li>On win32: <code>nmake</code> or <code>msbuild</code>, or open it in visual studio and
+build from there</li>
+</ul><p>Things you can pass to cmake to change the build:</p>
+
+<ul>
+<li>
+<code>-DRABBITMQ_CODEGEN_DIR=/path/to/rabbitmq-codegen/checkout</code> - if you
+have your codegen directory in a different place [Default is
+sibiling directory to source]</li>
+<li>
+<code>-DBUILD_TOOLS=OFF</code> build the programs in the tools directory
+[Default is ON if the POPT library can be found]</li>
+</ul><p>Other interesting flags to pass to CMake (see cmake docs for more info)</p>
+
+<ul>
+<li>
+<code>-DCMAKE_BUILD_TYPE</code> - specify the type of build (Debug or Release)</li>
+<li>
+<code>-DCMAKE_INSTALL_PREFIX</code> - specify where the install target puts files</li>
+</ul><h2>Running the examples</h2>
+
+<p>Arrange for a RabbitMQ or other AMQP server to be running on
+<code>localhost</code> at TCP port number 5672.</p>
+
+<p>In one terminal, run</p>
+
+<pre><code>./examples/amqp_listen localhost 5672 amq.direct test
+</code></pre>
+
+<p>In another terminal,</p>
+
+<pre><code>./examples/amqp_sendstring localhost 5672 amq.direct test "hello world"
+</code></pre>
+
+<p>You should see output similar to the following in the listener's
+terminal window:</p>
+
+<pre><code>Result 1
+Frame type 1, channel 1
+Method AMQP_BASIC_DELIVER_METHOD
+Delivery 1, exchange amq.direct routingkey test
+Content-type: text/plain
+----
+00000000: 68 65 6C 6C 6F 20 77 6F : 72 6C 64                 hello world
+0000000B:
+</code></pre>
+
+<h2>Writing applications using <code>librabbitmq</code>
+</h2>
+
+<p>Please see the <code>examples</code> directory for short examples of the use of
+the <code>librabbitmq</code> library.</p>
+
+<h3>Threading</h3>
+
+<p>You cannot share a socket, an <code>amqp_connection_state_t</code>, or a channel
+between threads using <code>librabbitmq</code>. The <code>librabbitmq</code> library is
+built with event-driven, single-threaded applications in mind, and
+does not yet cater to any of the requirements of <code>pthread</code>ed
+applications.</p>
+
+<p>Your applications instead should open an AMQP connection (and an
+associated socket, of course) per thread. If your program needs to
+access an AMQP connection or any of its channels from more than one
+thread, it is entirely responsible for designing and implementing an
+appropriate locking scheme. It will generally be much simpler to have
+a connection exclusive to each thread that needs AMQP service.</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/alanxz">alanxz</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
