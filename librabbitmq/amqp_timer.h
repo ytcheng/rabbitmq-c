@@ -25,6 +25,9 @@
 
 #include <stdint.h>
 
+#define NS_PER_S 1000000000
+#define NS_PER_US 1000
+
 /* Gets a monotonic timestamp in ns */
 uint64_t
 amqp_get_monotonic_timestamp(void);

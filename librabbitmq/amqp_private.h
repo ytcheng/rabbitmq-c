@@ -72,9 +72,6 @@
 #define ERROR_HEARTBEAT_TIMEOUT 9
 #define ERROR_MAX 9
 
-#define NS_PER_S 1000000000
-#define NS_PER_US 1000
-
 /* GCC attributes */
 #if __GNUC__ > 2 | (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define AMQP_NORETURN \
