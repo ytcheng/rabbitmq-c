@@ -40,6 +40,7 @@
 
 #include "amqp_tcp_socket.h"
 #include "amqp_private.h"
+#include "amqp_timer.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
@@ -141,6 +142,12 @@ int amqp_tune_connection(amqp_connection_state_t state,
   state->channel_max = channel_max;
   state->frame_max = frame_max;
   state->heartbeat = heartbeat;
+
+  if (state->heartbeat > 0) {
+    uint64_t current_time = amqp_get_monotonic_timestamp();
+    state->next_send_heartbeat = current_time + (state->heartbeat * NS_PER_S);
+    state->next_recv_heartbeat = current_time + (2 *state->heartbeat * NS_PER_S);
+  }
 
   empty_amqp_pool(&state->frame_pool);
   init_amqp_pool(&state->frame_pool, frame_max);
@@ -459,6 +466,10 @@ int amqp_send_frame(amqp_connection_state_t state,
   if (res < 0) {
     return -amqp_socket_error(state->socket);
   } else {
+    if (state->heartbeat > 0) {
+      uint64_t current_time = amqp_get_monotonic_timestamp();
+      state->next_send_heartbeat = current_time + (state->heartbeat * NS_PER_S);
+    }
     return 0;
   }
 }

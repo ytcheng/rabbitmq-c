@@ -39,6 +39,7 @@
 #endif
 
 #include "amqp_private.h"
+#include "amqp_timer.h"
 
 #include "socket.h"
 
@@ -48,6 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 
 ssize_t
 amqp_socket_writev(amqp_socket_t *self, const struct iovec *iov, int iovcnt)
@@ -267,6 +269,10 @@ static int wait_frame_inner(amqp_connection_state_t state,
 
       state->sock_inbound_offset += res;
 
+      if (decoded_frame->frame_type == AMQP_FRAME_HEARTBEAT) {
+        continue;
+      }
+
       if (decoded_frame->frame_type != 0) {
         /* Complete frame was read. Return it. */
         return 0;
@@ -274,6 +280,81 @@ static int wait_frame_inner(amqp_connection_state_t state,
 
       /* Incomplete or ignored frame. Keep processing input. */
       assert(res != 0);
+    }
+
+    if (state->heartbeat > 0) {
+      while (1) {
+        uint64_t current_time = amqp_get_monotonic_timestamp();
+        uint64_t next_timeout;
+
+        if (current_time > state->next_recv_heartbeat) {
+          amqp_socket_close(state->socket);
+          return -ERROR_HEARTBEAT_TIMEOUT;
+        }
+        else if (current_time > state->next_send_heartbeat) {
+          amqp_frame_t heartbeat;
+          heartbeat.channel = 0;
+          heartbeat.frame_type = AMQP_FRAME_HEARTBEAT;
+
+          res = amqp_send_frame(state, &heartbeat);
+          if (0 != res) {
+            return res;
+          }
+
+          current_time = amqp_get_monotonic_timestamp();
+        }
+
+        next_timeout = (state->next_recv_heartbeat < state->next_send_heartbeat ?
+            state->next_recv_heartbeat :
+            state->next_send_heartbeat);
+
+        {
+          uint64_t timeout;
+          struct timeval tv_timeout;
+          int sockfd;
+          fd_set fds;
+
+          timeout = next_timeout - current_time;
+
+          tv_timeout.tv_sec = timeout / NS_PER_S;
+          tv_timeout.tv_usec = (timeout % NS_PER_S) / NS_PER_US;
+
+          sockfd = amqp_socket_get_sockfd(state->socket);
+          FD_ZERO(&fds);
+          FD_SET(sockfd, &fds);
+
+          res = select(sockfd + 1, &fds, NULL, &fds, &tv_timeout);
+
+          if (res > 0) {
+            break;
+          }
+          else if (0 == res) {
+            if (next_timeout == state->next_send_heartbeat) {
+              amqp_frame_t heartbeat;
+              heartbeat.channel = 0;
+              heartbeat.frame_type = AMQP_FRAME_HEARTBEAT;
+
+              res = amqp_send_frame(state, &heartbeat);
+              if (0 != res) {
+                return res;
+              }
+              continue;
+            }
+            else {
+              amqp_socket_close(state->socket);
+              return -ERROR_HEARTBEAT_TIMEOUT;
+            }
+          }
+          else {
+            if (errno == EINTR) {
+              continue;
+            }
+            else {
+              return -amqp_os_socket_error();
+            }
+          }
+        }
+      }
     }
 
     res = amqp_socket_recv(state->socket, state->sock_inbound_buffer.bytes,
@@ -284,6 +365,11 @@ static int wait_frame_inner(amqp_connection_state_t state,
       } else {
         return -amqp_socket_error(state->socket);
       }
+    }
+
+    if (state->heartbeat > 0) {
+      uint64_t current_time = amqp_get_monotonic_timestamp();
+      state->next_recv_heartbeat = current_time + (2 * state->heartbeat * NS_PER_S);
     }
 
     state->sock_inbound_limit = res;

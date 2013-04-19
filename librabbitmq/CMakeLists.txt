@@ -120,6 +120,7 @@ set(RABBITMQ_SOURCES
     ${AMQP_FRAMING_C_PATH}
     amqp_api.c amqp.h amqp_connection.c amqp_mem.c amqp_private.h amqp_socket.c
     amqp_table.c amqp_url.c amqp_socket.h amqp_tcp_socket.c amqp_tcp_socket.h
+    amqp_timer.c amqp_timer.h
     ${SOCKET_IMPL}/socket.h ${SOCKET_IMPL}/socket.c
     ${AMQP_SSL_SRCS}
 )

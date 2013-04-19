@@ -69,7 +69,11 @@
 #define ERROR_INCOMPATIBLE_AMQP_VERSION 6
 #define ERROR_CONNECTION_CLOSED 7
 #define ERROR_BAD_AMQP_URL 8
-#define ERROR_MAX 8
+#define ERROR_HEARTBEAT_TIMEOUT 9
+#define ERROR_MAX 9
+
+#define NS_PER_S 1000000000
+#define NS_PER_US 1000
 
 /* GCC attributes */
 #if __GNUC__ > 2 | (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
@@ -165,6 +169,9 @@ struct amqp_connection_state_t_ {
   amqp_link_t *last_queued_frame;
 
   amqp_rpc_reply_t most_recent_api_result;
+
+  uint64_t next_recv_heartbeat;
+  uint64_t next_send_heartbeat;
 };
 
 static inline void *amqp_offset(void *data, size_t offset)

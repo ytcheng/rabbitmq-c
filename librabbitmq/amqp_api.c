@@ -55,6 +55,7 @@ static const char *client_error_strings[ERROR_MAX] = {
   "incompatible AMQP version", /* ERROR_INCOMPATIBLE_AMQP_VERSION */
   "connection closed unexpectedly", /* ERROR_CONNECTION_CLOSED */
   "could not parse AMQP URL", /* ERROR_BAD_AMQP_URL */
+  "heartbeat timed out, connection closed", /* ERROR_HEARTBEAT_TIMEOUT */
 };
 
 char *amqp_error_string(int err)
