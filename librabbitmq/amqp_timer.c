@@ -89,6 +89,6 @@ amqp_get_monotonic_timestamp(void)
     return 0;
   }
 
-  return ((uint64_t)tp.tv_sec * NS_PER_S + (uint64_t)tp.tv_ns);
+  return ((uint64_t)tp.tv_sec * NS_PER_S + (uint64_t)tp.tv_nsec);
 }
 #endif /* AMQP_POSIX_TIMER_API */
