@@ -48,6 +48,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <time.h>
 
 ssize_t
 amqp_socket_writev(amqp_socket_t *self, const struct iovec *iov, int iovcnt)
@@ -108,7 +111,7 @@ amqp_socket_get_sockfd(amqp_socket_t *self)
 }
 
 int amqp_open_socket(char const *hostname,
-                     int portnumber)
+                     int portnumber, struct timeval *timeout)
 {
   struct addrinfo hint;
   struct addrinfo *address_list;
@@ -117,6 +120,7 @@ int amqp_open_socket(char const *hostname,
   int sockfd = -1;
   int last_error = 0;
   int one = 1; /* for setsockopt */
+  int flags;
 
   last_error = amqp_socket_init();
   if (0 != last_error) {
@@ -146,6 +150,12 @@ int amqp_open_socket(char const *hostname,
       last_error = -amqp_os_socket_error();
       continue;
     }
+	if(((flags = fcntl(sockfd, F_GETFL, 0)) == -1) ||
+     (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1)) {
+        last_error = -errno;
+        amqp_os_socket_close(sockfd);		
+        continue;
+    }
 #ifdef DISABLE_SIGPIPE_WITH_SETSOCKOPT
     if (0 != amqp_socket_setsockopt(sockfd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one))) {
       last_error = -amqp_os_socket_error();
@@ -155,9 +165,28 @@ int amqp_open_socket(char const *hostname,
 #endif /* DISABLE_SIGPIPE_WITH_SETSOCKOPT */
     if (0 != amqp_socket_setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one))
         || 0 != connect(sockfd, addr->ai_addr, addr->ai_addrlen)) {
-      last_error = -amqp_os_socket_error();
-      amqp_os_socket_close(sockfd);
-      continue;
+      if(errno == EINPROGRESS) {
+            int aerrno, prv;
+            socklen_t aerrno_len = sizeof(aerrno);
+            struct pollfd pfd;
+
+            pfd.fd = sockfd;
+            pfd.events = POLLOUT;
+            prv = poll(&pfd, 1, timeout?(timeout->tv_sec*1000 + timeout->tv_usec/1000):-1);
+            if(prv == 1) {
+                  if(getsockopt(sockfd,SOL_SOCKET,SO_ERROR, &aerrno, &aerrno_len) == 0) {
+                        if(aerrno == 0) break;
+                  }
+                  else
+                        break;
+                  last_error = -aerrno;
+            }
+            else last_error = -ETIMEDOUT;
+      }else{
+            last_error = -amqp_os_socket_error();
+            amqp_os_socket_close(sockfd);
+            continue;
+      }
     } else {
       last_error = 0;
       break;
@@ -168,7 +197,11 @@ int amqp_open_socket(char const *hostname,
   if (last_error != 0) {
     return last_error;
   }
-
+  if(((flags = fcntl(sockfd, F_GETFL, 0)) == -1) ||
+    (fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK) == -1)) {       
+       amqp_os_socket_close(sockfd);
+       return -errno;
+   }
   return sockfd;
 }
 

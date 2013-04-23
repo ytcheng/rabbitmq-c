@@ -132,7 +132,7 @@ amqp_ssl_socket_open(void *base, const char *host, int port)
     return -1;
   }
 
-  self->sockfd = amqp_open_socket(host, port);
+  self->sockfd = amqp_open_socket(host, port, NULL);
   if (0 > self->sockfd) {
     self->last_error = -self->sockfd;
     return -1;

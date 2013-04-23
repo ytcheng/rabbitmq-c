@@ -151,6 +151,7 @@ typedef _W64 int ssize_t;
 
 #include <stddef.h>
 #include <stdint.h>
+struct timeval;
 
 AMQP_BEGIN_DECLS
 
@@ -441,7 +442,7 @@ AMQP_CALL amqp_table_entry_cmp(void const *entry1, void const *entry2);
 
 AMQP_PUBLIC_FUNCTION
 int
-AMQP_CALL amqp_open_socket(char const *hostname, int portnumber);
+AMQP_CALL amqp_open_socket(char const *hostname, int portnumber, struct timeval *timeout);
 
 AMQP_PUBLIC_FUNCTION
 int

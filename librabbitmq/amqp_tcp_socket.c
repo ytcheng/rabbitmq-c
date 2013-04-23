@@ -60,7 +60,7 @@ static int
 amqp_tcp_socket_open(void *base, const char *host, int port)
 {
   struct amqp_tcp_socket_t *self = (struct amqp_tcp_socket_t *)base;
-  self->sockfd = amqp_open_socket(host, port);
+  self->sockfd = amqp_open_socket(host, port, NULL);
   if (0 > self->sockfd) {
     return -1;
   }
